@@ -1,0 +1,14 @@
+{
+  "cert_label": "demo_cert",
+  "cert_type": "PEM",
+  "service_name": "none",
+
+  "cert_dest_dir": "/etc/pki/tls/certs",
+  "key_dest_dir": "/etc/pki/tls/private",
+  "cert_dest_file": "/etc/pki/tls/certs/demo_cert.crt",
+
+  "jks_file": "demo.jks",
+  "kdb_file": "demo.kdb",
+  "keystore_password": "changeit"
+}
+

@@ -1,0 +1,91 @@
+---
+- name: Unified Certificate Deployment POC
+  hosts: all_servers
+  become: true
+  gather_facts: true
+
+  vars:
+    backup_dir: "/opt/cert_backups/{{ cert_label }}-{{ ansible_date_time.iso8601 }}"
+    cert_source_dir: "/workspaces/docs/ansible-poc/incoming"   # Codespaces path
+    # You can change this path as needed
+
+  tasks:
+
+    # ------------------------------
+    # Step 0 — Show metadata received
+    # ------------------------------
+    - name: Show metadata received
+      debug:
+        msg: "Deploying cert '{{ cert_label }}' of type '{{ cert_type }}' to {{ inventory_hostname }}"
+
+    # ------------------------------
+    # Step 1 — Stop Application Service
+    # ------------------------------
+    - name: Stop application service (simulated)
+      debug:
+        msg: "Stopping service {{ service_name }} (simulated)"
+      when: service_name != "none"
+
+    # ------------------------------
+    # Step 2 — Backup Existing Certs / Keystores
+    # ------------------------------
+    - name: Create backup directory
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Backup cert or keystore (simulated)
+      debug:
+        msg: "Backing up {{ cert_dest_file }} to {{ backup_dir }}"
+      when: cert_type in ["PEM", "JKS", "KDB"]
+
+    # ------------------------------
+    # Step 3 — Deploy New PEM Files
+    # ------------------------------
+    - name: Copy certificate
+      copy:
+        src: "{{ cert_source_dir }}/{{ cert_label }}.crt"
+        dest: "{{ cert_dest_dir }}/{{ cert_label }}.crt"
+      when: cert_type == "PEM"
+
+    - name: Copy private key
+      copy:
+        src: "{{ cert_source_dir }}/{{ cert_label }}.key"
+        dest: "{{ key_dest_dir }}/{{ cert_label }}.key"
+      when: cert_type == "PEM"
+
+    # ------------------------------
+    # Step 4 — Update JKS Keystore
+    # ------------------------------
+    - name: Import into JKS keystore using keytool (simulated)
+      debug:
+        msg: "Would run keytool to import cert into {{ jks_file }} keystore"
+      when: cert_type == "JKS"
+
+    # ------------------------------
+    # Step 5 — Update IBM KDB Keystore
+    # ------------------------------
+    - name: Import into KDB keystore (simulated)
+      debug:
+        msg: "Would run runmqckm to update {{ kdb_file }} keystore"
+      when: cert_type == "KDB"
+
+    # ------------------------------
+    # Step 6 — Restart Application Service
+    # ------------------------------
+    - name: Restart application service (simulated)
+      debug:
+        msg: "Restarting service {{ service_name }} (simulated)"
+      when: service_name != "none"
+
+    # ------------------------------
+    # Step 7 — Summary
+    # ------------------------------
+    - name: Final Summary
+      debug:
+        msg:
+          - "Certificate deployment completed."
+          - "Label: {{ cert_label }}"
+          - "Type: {{ cert_type }}"
+          - "Service restarted: {{ service_name }}"
