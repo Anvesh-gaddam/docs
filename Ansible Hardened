@@ -1,0 +1,207 @@
+IBM MQ Certificate Renewal – Shield Automation 
+Overview
+This Ansible playbook automates the secure, zero-downtime renewal of SSL/TLS certificates for IBM MQ Queue Managers (QMs).
+It is designed for enterprise environments such as Verizon, where MQ instances run at scale and certificate rotation must be performed safely, consistently, and with full rollback capability.
+This playbook follows IBM best practices and includes additional hardening layers for:
+•	Keystore integrity
+•	Stash file validation
+•	P12 certificate sanity checks
+•	Safe delete/import operations
+•	Full rollback protection
+•	MQ SSL cache refresh
+•	Deep error-log inspection
+•	Post-renewal channel validation
+________________________________________
+Features & Guarantees
+✔ Zero downtime
+The playbook does not restart the Queue Manager. It uses:
+REFRESH SECURITY TYPE(SSL)
+which applies the new certificate while MQ stays online.
+________________________________________
+✔ End-to-end certificate validation
+Before modifying the keystore, the playbook validates:
+•	P12 structure
+•	Certificate label
+•	Certificate expiry
+•	Certificate chain
+•	Matching of label names
+•	No duplicate labels in KDB
+________________________________________
+✔ Full keystore safety
+Both KDB (keystore) and STH (stash file) are backed up and validated.
+The STH file is critical—without it MQ cannot unlock the keystore.
+This playbook confirms:
+•	Files exist
+•	STH password successfully decrypts the KDB
+•	Rollback restores BOTH files safely
+________________________________________
+✔ Rollback-safe by design
+If ANY step fails:
+•	KDB is restored
+•	STH is restored
+•	SSL cache is refreshed
+•	Playbook terminates cleanly
+You always return to the last known-good state.
+________________________________________
+✔ Security-first permissions
+All imported artifacts are hardened with correct MQ ownership:
+owner: mqm
+group: mqm
+mode: 0600–0640
+MQ is extremely sensitive to file permissions, especially the private key and stash file.
+This playbook enforces safe ACLs recursively.
+________________________________________
+✔ Deep MQ error detection
+MQ surfaces SSL errors in log files:
+AMQERR01.LOG, AMQERR02.LOG, AMQERR03.LOG.
+The playbook scans for IBM error codes including:
+•	AMQ9633
+•	AMQ9642
+•	AMQ9665
+•	AMQ9637
+Any SSL-related message causes an immediate fail.
+________________________________________
+✔ Channel & TLS validation
+After certificate renewal:
+•	All channels are inspected
+•	Any non-RUNNING channel is flagged
+•	openssl s_client handshake validates:
+o	SAN/CN matching
+o	Certificate trust
+o	Full chain verification
+This provides real-time proof that MQ is accepting TLS connections.
+________________________________________
+Playbook Workflow
+Below is a high-level outline of what the playbook does.
+________________________________________
+1. Input Validation
+Ensures all required variables are present:
+•	QM name
+•	KDB name
+•	Cert label
+•	Host/port for handshake
+•	Artifactory token
+•	P12 password (Vault-aware)
+________________________________________
+2. Download New Certificate
+Fetches the .p12 file from Artifactory with token-based authentication.
+Performs integrity checks:
+•	Size check
+•	Expected label in P12
+•	Expiry date
+•	Certificate chain inspection
+________________________________________
+3. Pre-Checks
+Ensures:
+•	KDB file exists
+•	STH file exists
+•	Stash decrypts keystore successfully
+•	MQ Queue Manager is reachable
+•	MQSC commands work
+These conditions prevent keystore corruption or partial updates.
+________________________________________
+4. Backup Phase (Critical)
+Creates timestamped backup copies of:
+•	*.kdb (keystore)
+•	*.sth (stash file)
+Validates backup integrity before proceeding.
+________________________________________
+5. Delete Old Certificate Label
+Safely deletes old label using:
+runmqakm -cert -delete -stashed
+Errors are ignored because label may not exist (first-time setup).
+________________________________________
+6. Import New Certificate
+Imports new certificate securely:
+runmqakm -cert -import -type pkcs12 -target_stashed
+No plaintext passwords are exposed.
+The playbook then checks:
+•	Import return code
+•	Duplicate labels
+•	Certificate correctly added
+________________________________________
+7. Permission Enforcement
+Recursively applies correct ACLs to all MQ SSL files.
+________________________________________
+8. Reload MQ SSL Cache (No Restart Required)
+Runs:
+refresh security type(ssl)
+Validates correct refresh response.
+________________________________________
+9. Deep Log Inspection
+Scans all MQ error logs for SSL issues:
+•	AMQ96xx errors
+•	Misconfigured TLS
+•	Broken keystore references
+________________________________________
+10. Channel Validation
+Checks channel configuration:
+•	Channel status
+•	SSL cert label usage
+•	Non-RUNNING channels
+________________________________________
+11. TLS Handshake Test
+Uses openssl s_client to verify end-to-end TLS connectivity.
+________________________________________
+12. Cleanup
+Removes temporary files for security and hygiene.
+________________________________________
+Rollback Logic
+If ANY step in the import/refresh/validation phase fails:
+1.	Restore KDB from backup
+2.	Restore STH from backup
+3.	Refresh SSL cache
+4.	Fail the play with a clear error
+Rollback ensures MQ is never left in a broken SSL state.
+________________________________________
+Requirements
+•	Ansible 2.9+
+•	IBM MQ 9.x
+•	MQ client utilities installed (runmqakm, runmqsc)
+•	SSH access with mqm permissions
+•	Artifactory/JFrog API token
+•	P12 password (stored in Vault recommended)
+________________________________________
+Variables (Inputs)
+These are expected from Jenkins / AWX:
+Variable	Required	Description
+qmgr_name	Yes	Queue Manager name
+kdb_name	Yes	Keystore base filename
+cert_label	Yes	Label inside KDB
+host_port	Yes	Port for handshake test
+artifactory_url	Yes	Artifactory endpoint
+artifactory_repo	Yes	Repo name
+artifactory_path	Yes	Path to certificate
+artifactory_token	Yes	API token
+p12_password	Yes	P12 password (Vault)
+________________________________________
+Outputs
+The playbook produces:
+•	Updated certificate in KDB
+•	Updated stash file untouched
+•	Backup directories with timestamp
+•	SSL refresh result
+•	Certificate details
+•	Channel summaries
+•	TLS handshake output
+________________________________________
+Why This Playbook Is "Golden"
+Because it satisfies ALL of these:
+✔ Safety
+No corruption of KDB/STH. No restarts needed.
+✔ Security
+Strict validation, no plaintext secrets exposed.
+✔ Reliability
+Rollback ensures the system never breaks.
+✔ Observability
+Logs, channels, TLS handshakes fully validated.
+✔ Enterprise-readiness
+Designed for thousands of QMs, scalable, idempotent.
+________________________________________
+Contact & Maintainers
+Automation Team – Certificate Renewal Program (Shield Tool)
+For issues, open a ticket in:
+<internal Jira / GitLab issues link>
+________________________________________
+If you'd like, I can also generate:
+
